@@ -40,17 +40,24 @@ RUN git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git /opt/Cosy
 # The upstream requirements include training and TensorRT packages that are not
 # needed for the default PyTorch streaming runtime. Torch is already supplied by
 # the CUDA base image at the exact upstream version.
-RUN python -m pip install --upgrade pip setuptools wheel \
-    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|gradio==|matplotlib==|tensorboard==|lightning==)' \
+#
+# openai-whisper==20231117 still imports pkg_resources from its setup script.
+# New isolated setuptools build environments may no longer provide it, so
+# Whisper is installed separately with a compatible setuptools version and
+# build isolation disabled.
+RUN python -m pip install --upgrade "pip<26" "setuptools==75.8.0" wheel \
+    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|gradio==|matplotlib==|tensorboard==|lightning==|openai-whisper==)' \
          /opt/CosyVoice/requirements.txt > /tmp/runtime-requirements.txt \
     && python -m pip install \
          --extra-index-url https://download.pytorch.org/whl/cu121 \
          --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ \
          -r /tmp/runtime-requirements.txt \
+    && python -m pip install --no-build-isolation "openai-whisper==20231117" \
     && python -m pip install \
          huggingface_hub==0.30.2 \
          python-multipart==0.0.20 \
          websockets==15.0.1 \
+    && python -c "import pkg_resources, whisper; print('Whisper import OK')" \
     && rm -f /tmp/runtime-requirements.txt
 
 RUN mkdir -p "${MODEL_DIR}" \
