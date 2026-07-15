@@ -41,12 +41,15 @@ RUN git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git /opt/Cosy
 # needed for the default PyTorch streaming runtime. Torch is already supplied by
 # the CUDA base image at the exact upstream version.
 #
+# Lightning must remain installed: Matcha-TTS imports lightning.Callback while
+# CosyVoice loads its flow-matching classes, even for inference-only startup.
+#
 # openai-whisper==20231117 still imports pkg_resources from its setup script.
 # New isolated setuptools build environments may no longer provide it, so
 # Whisper is installed separately with a compatible setuptools version and
 # build isolation disabled.
 RUN python -m pip install --upgrade "pip<26" "setuptools==75.8.0" wheel \
-    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|gradio==|matplotlib==|tensorboard==|lightning==|openai-whisper==)' \
+    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|gradio==|matplotlib==|tensorboard==|openai-whisper==)' \
          /opt/CosyVoice/requirements.txt > /tmp/runtime-requirements.txt \
     && python -m pip install \
          --extra-index-url https://download.pytorch.org/whl/cu121 \
@@ -57,7 +60,7 @@ RUN python -m pip install --upgrade "pip<26" "setuptools==75.8.0" wheel \
          huggingface_hub==0.30.2 \
          python-multipart==0.0.20 \
          websockets==15.0.1 \
-    && python -c "import pkg_resources, whisper; print('Whisper import OK')" \
+    && python -c "import sys; sys.path.insert(0, '/opt/CosyVoice'); sys.path.insert(0, '/opt/CosyVoice/third_party/Matcha-TTS'); import pkg_resources, whisper, lightning; import cosyvoice.flow.flow_matching; print('CosyVoice runtime imports OK')" \
     && rm -f /tmp/runtime-requirements.txt
 
 RUN mkdir -p "${MODEL_DIR}" \
