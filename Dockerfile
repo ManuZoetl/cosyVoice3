@@ -54,13 +54,7 @@ RUN python -m pip install --upgrade pip setuptools wheel \
     && rm -f /tmp/runtime-requirements.txt
 
 RUN mkdir -p "${MODEL_DIR}" \
-    && python - <<PY
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="${MODEL_ID}",
-    local_dir="${MODEL_DIR}",
-)
-PY
+    && python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='${MODEL_ID}', local_dir='${MODEL_DIR}')"
 
 WORKDIR /app
 COPY server.py /app/server.py
