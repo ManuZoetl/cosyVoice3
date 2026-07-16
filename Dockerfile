@@ -37,19 +37,16 @@ RUN git clone --recursive https://github.com/FunAudioLLM/CosyVoice.git /opt/Cosy
     && git checkout "${COSYVOICE_COMMIT}" \
     && git submodule update --init --recursive
 
-# The upstream requirements include training and TensorRT packages that are not
-# needed for the default PyTorch streaming runtime. Torch is already supplied by
-# the CUDA base image at the exact upstream version.
+# Keep the upstream runtime dependency set intact. Matcha-TTS imports packages
+# such as Lightning and Matplotlib during normal inference startup, even though
+# parts of those packages are commonly associated with training utilities.
 #
-# Lightning must remain installed: Matcha-TTS imports lightning.Callback while
-# CosyVoice loads its flow-matching classes, even for inference-only startup.
-#
-# openai-whisper==20231117 still imports pkg_resources from its setup script.
-# New isolated setuptools build environments may no longer provide it, so
-# Whisper is installed separately with a compatible setuptools version and
-# build isolation disabled.
+# Only CUDA/TensorRT training extras and Torch packages already supplied by the
+# base image are omitted. openai-whisper is installed separately because its
+# legacy setup script imports pkg_resources and fails in newer isolated build
+# environments.
 RUN python -m pip install --upgrade "pip<26" "setuptools==75.8.0" wheel \
-    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|gradio==|matplotlib==|tensorboard==|openai-whisper==)' \
+    && grep -vE '^(deepspeed|tensorrt-cu12|tensorrt-cu12-bindings|tensorrt-cu12-libs|torch==|torchaudio==|openai-whisper==)' \
          /opt/CosyVoice/requirements.txt > /tmp/runtime-requirements.txt \
     && python -m pip install \
          --extra-index-url https://download.pytorch.org/whl/cu121 \
@@ -60,7 +57,7 @@ RUN python -m pip install --upgrade "pip<26" "setuptools==75.8.0" wheel \
          huggingface_hub==0.30.2 \
          python-multipart==0.0.20 \
          websockets==15.0.1 \
-    && python -c "import sys; sys.path.insert(0, '/opt/CosyVoice'); sys.path.insert(0, '/opt/CosyVoice/third_party/Matcha-TTS'); import pkg_resources, whisper, lightning; import cosyvoice.flow.flow_matching; print('CosyVoice runtime imports OK')" \
+    && python -c "import sys; sys.path.insert(0, '/opt/CosyVoice'); sys.path.insert(0, '/opt/CosyVoice/third_party/Matcha-TTS'); import pkg_resources, whisper, lightning, matplotlib, torchaudio; from cosyvoice.cli.cosyvoice import AutoModel; import cosyvoice.flow.flow_matching; print('CosyVoice runtime imports OK')" \
     && rm -f /tmp/runtime-requirements.txt
 
 RUN mkdir -p "${MODEL_DIR}" \
